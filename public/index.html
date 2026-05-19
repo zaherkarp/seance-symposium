@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Design Review Agents</title>
+  <title>Seance Symposium</title>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -109,6 +109,11 @@
       { id: 'bertin', name: 'Jacques Bertin', icon: '🧬', philosophy: 'Systematic rigor, perceptual science' },
       { id: 'few', name: 'Stephen Few', icon: '⚙️', philosophy: 'Pragmatism, business value, performance' },
       { id: 'shneiderman', name: 'Ben Shneiderman', icon: '🎮', philosophy: 'Interactivity, user agency, exploration' },
+      { id: 'norman', name: 'Don Norman', icon: '🧠', philosophy: 'Human-centered usability, product psychology' },
+      { id: 'maeda', name: 'John Maeda', icon: '💻', philosophy: 'Computational design, digital elegance' },
+      { id: 'lupi', name: 'Giorgia Lupi', icon: '✍️', philosophy: 'Data humanism, narrative meaning' },
+      { id: 'felton', name: 'Nicholas Felton', icon: '🗓️', philosophy: 'Personal data storytelling, craft' },
+      { id: 'krug', name: 'Steve Krug', icon: '🖱️', philosophy: 'Web usability, scanning, simplicity' },
       { id: 'inclusive', name: 'Inclusive Design', icon: '♿', philosophy: 'Accessibility, neurodiversity, cultural sensitivity' },
     ];
 
@@ -118,6 +123,11 @@
       { id: 'bertin', name: 'Bertin Group', icon: '🧬', label: 'Semiotics' },
       { id: 'few', name: 'Few Group', icon: '⚙️', label: 'Pragmatism' },
       { id: 'shneiderman', name: 'Shneiderman Group', icon: '🎮', label: 'HCI' },
+      { id: 'norman', name: 'Norman Group', icon: '🧠', label: 'UX' },
+      { id: 'maeda', name: 'Maeda Group', icon: '💻', label: 'Computational Design' },
+      { id: 'lupi', name: 'Lupi Group', icon: '✍️', label: 'Data Humanism' },
+      { id: 'felton', name: 'Felton Group', icon: '🗓️', label: 'Personal Data' },
+      { id: 'krug', name: 'Krug Group', icon: '🖱️', label: 'Web Usability' },
       { id: 'inclusive', name: 'Inclusive Group', icon: '♿', label: 'Inclusive' },
     ];
 
@@ -237,7 +247,7 @@
         }
         setError('');
         resetResultsState();
-        setStatusMessage(includeSynthesis ? 'Running 6 critics, then 6 grad-student groups…' : 'Running 6 critics in parallel…');
+        setStatusMessage(includeSynthesis ? 'Running critics, then grad-student groups…' : 'Running critics in parallel…');
         setStep('evaluating');
         try {
           const response = await fetch('/api/evaluate', {
@@ -265,7 +275,7 @@
       const runFixtureSynthesis = async () => {
         setError('');
         resetResultsState();
-        setStatusMessage('Loading fixture and running 6 grad-student groups…');
+        setStatusMessage('Loading fixture and running grad-student groups…');
         setStep('evaluating');
         try {
           const fixtureResp = await fetch('/api/fixture');
@@ -311,11 +321,10 @@
           <div style={{ minHeight: '100vh', padding: '40px 20px' }}>
             <div style={{ maxWidth: '900px', margin: '0 auto' }}>
               <h1 style={{ fontSize: '36px', fontWeight: 300, margin: '0 0 8px 0', letterSpacing: '-0.5px' }}>
-                Design Review Agents
+                Seance Symposium
               </h1>
               <p style={{ fontSize: '14px', color: '#999', margin: '0 0 32px 0' }}>
-                6 critics evaluate your design in parallel. 6 grad-student groups synthesize the results
-                into discipline-specific presentations.
+                A spectrum of visualization and web design critics evaluate your work. Disciplinary groups then synthesize the findings into site-focused presentations.
               </p>
 
               {error && (
@@ -411,7 +420,7 @@
                 <div>
                   <div style={{ fontSize: '13px', fontWeight: 600 }}>Run grad-student synthesis</div>
                   <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>
-                    After the 6 critics finish, 6 discipline groups produce semester-style presentations. Adds ~30–60s.
+                    After the critics finish, discipline groups produce semester-style presentations from multiple design and critique traditions. Adds ~30–60s.
                   </div>
                 </div>
               </label>

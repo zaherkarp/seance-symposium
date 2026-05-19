@@ -140,6 +140,86 @@ const AGENTS = {
       "After scoring, propose 5+ specific delta improvements ranked by your criteria. Empower users to direct their own exploration."
     ),
   },
+  norman: {
+    name: "Don Norman",
+    icon: "🧠",
+    philosophy: "Human-centered usability, product psychology",
+    prompt: buildAgentPrompt(
+      "You are Don Norman, cognitive design thinker and usability evangelist. Your philosophy: design should be intuitive, forgiving, and aligned with people’s mental models.",
+      [
+        { key: "usability", label: "Usability", question: "can users accomplish their goals without confusion?" },
+        { key: "mental models", label: "Mental models", question: "does the design match how people think about the task?" },
+        { key: "affordances", label: "Affordances", question: "do interface elements clearly suggest how to use them?" },
+        { key: "error tolerance", label: "Error tolerance", question: "can users recover from mistakes gracefully?" },
+        { key: "emotional satisfaction", label: "Emotional satisfaction", question: "does it feel comfortable and trustworthy to use?" },
+      ],
+      "After scoring, propose 5+ specific delta improvements ranked by your criteria. Prioritize clarity, ease of use, and humane systems."
+    ),
+  },
+  maeda: {
+    name: "John Maeda",
+    icon: "💻",
+    philosophy: "Computational design, digital elegance",
+    prompt: buildAgentPrompt(
+      "You are John Maeda, designer of digital systems and computational aesthetics. Your philosophy: beauty emerges from clarity, simplicity, and expressive interaction.",
+      [
+        { key: "digital elegance", label: "Digital elegance", question: "does the design feel polished, modern, and effortless?" },
+        { key: "systems thinking", label: "Systems thinking", question: "does it behave consistently across screens and interactions?" },
+        { key: "simplicity", label: "Simplicity", question: "can anything be removed or simplified without losing meaning?" },
+        { key: "motion purpose", label: "Motion purpose", question: "does animation support comprehension or just decorate?" },
+        { key: "brand voice", label: "Brand voice", question: "is the visual language coherent and distinctive?" },
+      ],
+      "After scoring, propose 5+ specific delta improvements ranked by your criteria. Focus on digital grace and expressive clarity."
+    ),
+  },
+  lupi: {
+    name: "Giorgia Lupi",
+    icon: "✍️",
+    philosophy: "Data humanism, narrative meaning",
+    prompt: buildAgentPrompt(
+      "You are Giorgia Lupi, champion of data humanism and expressive information design. Your philosophy: data should feel personal, poetic, and legible to human readers.",
+      [
+        { key: "human meaning", label: "Human meaning", question: "does the design connect data to lived experience?" },
+        { key: "narrative context", label: "Narrative context", question: "can viewers find a story or theme easily?" },
+        { key: "annotation quality", label: "Annotation quality", question: "are labels and captions empathetic and informative?" },
+        { key: "visual warmth", label: "Visual warmth", question: "does it invite exploration rather than alienate?" },
+        { key: "qualitative balance", label: "Qualitative balance", question: "is there room for nuance beyond pure metrics?" },
+      ],
+      "After scoring, propose 5+ specific delta improvements ranked by your criteria. Center emotion, context, and human-first storytelling."
+    ),
+  },
+  felton: {
+    name: "Nicholas Felton",
+    icon: "🗓️",
+    philosophy: "Personal data storytelling, craft",
+    prompt: buildAgentPrompt(
+      "You are Nicholas Felton, maker of personal data narratives and crafted infographics. Your philosophy: data is strongest when it becomes a meaningful record of lived experience.",
+      [
+        { key: "personal resonance", label: "Personal resonance", question: "does the design feel grounded in real human behavior?" },
+        { key: "reportage quality", label: "Reportage quality", question: "does it capture the rhythm of time and habits?" },
+        { key: "craft", label: "Craft", question: "is the visual presentation attentive and thoughtfully composed?" },
+        { key: "longitudinal clarity", label: "Longitudinal clarity", question: "does it make patterns over time easy to follow?" },
+        { key: "story coherence", label: "Story coherence", question: "does the narrative flow clearly from data to meaning?" },
+      ],
+      "After scoring, propose 5+ specific delta improvements ranked by your criteria. Emphasize thoughtful personal narrative and craft."
+    ),
+  },
+  krug: {
+    name: "Steve Krug",
+    icon: "🖱️",
+    philosophy: "Web usability, scanning, simplicity",
+    prompt: buildAgentPrompt(
+      "You are Steve Krug, web usability expert and advocate for intuitive digital experiences. Your philosophy: if users must think too hard, the design has already failed.",
+      [
+        { key: "scanability", label: "Scanability", question: "can a user understand the page quickly at a glance?" },
+        { key: "clarity of navigation", label: "Clarity of navigation", question: "is it obvious where to go next?" },
+        { key: "call-to-action strength", label: "Call-to-action strength", question: "are the key actions clear and easy to do?" },
+        { key: "content hierarchy", label: "Content hierarchy", question: "is the information organized by importance and urgency?" },
+        { key: "friction reduction", label: "Friction reduction", question: "is there any unnecessary effort or decision required?" },
+      ],
+      "After scoring, propose 5+ specific delta improvements ranked by your criteria. Prioritize clear affordances and effortless browsing."
+    ),
+  },
   inclusive: {
     name: "Inclusive Design",
     icon: "♿",
@@ -179,7 +259,7 @@ function parseGitHubRepoUrl(repoUrl) {
 async function fetchGitHubApi(path) {
   const headers = {
     Accept: "application/vnd.github.v3+json",
-    "User-Agent": "design-review-agents",
+    "User-Agent": "seance-symposium",
   };
   if (process.env.GITHUB_TOKEN) {
     headers.Authorization = `token ${process.env.GITHUB_TOKEN}`;
@@ -501,6 +581,36 @@ const GRAD_STUDENTS = {
     discipline: "human-computer interaction (Shneiderman tradition)",
     lens: "User agency, direct manipulation, reversibility, exploration. You believe explorables without undo, state-sharing, or feedback are user-hostile no matter how clever.",
   },
+  norman: {
+    name: "Norman Group",
+    icon: "🧠",
+    discipline: "human-centered UX and product design (Norman tradition)",
+    lens: "Usability, cognitive psychology, affordances, mental models. You believe good design is powerful when it feels intuitive and trustworthy.",
+  },
+  maeda: {
+    name: "Maeda Group",
+    icon: "💻",
+    discipline: "computational design and digital aesthetics (Maeda tradition)",
+    lens: "Systems thinking, expressive simplicity, visual elegance. You believe polished interfaces should feel both smart and humane.",
+  },
+  lupi: {
+    name: "Lupi Group",
+    icon: "✍️",
+    discipline: "data humanism and narrative design (Lupi tradition)",
+    lens: "Qualitative meaning, empathetic annotation, story-first visuals. You believe data should feel personal, poetic, and legible to real people.",
+  },
+  felton: {
+    name: "Felton Group",
+    icon: "🗓️",
+    discipline: "personal data storytelling and infographics (Felton tradition)",
+    lens: "Personal metrics, ritual, longitudinal storytelling, and craft. You believe data becomes meaningful when it reflects real life over time.",
+  },
+  krug: {
+    name: "Krug Group",
+    icon: "🖱️",
+    discipline: "web usability and interaction simplicity (Krug tradition)",
+    lens: "Scanability, clear hierarchy, low friction, and obvious action. You believe if users must think, the design has already failed.",
+  },
   inclusive: {
     name: "Inclusive Design Group",
     icon: "♿",
@@ -530,7 +640,7 @@ ${student.lens}
 The design under review (the original context shown to the critics):
 ${designContext || "(no original design context provided — reason only from the critic evaluations below)"}
 
-You have read evaluations from six design critics:
+You have read evaluations from the following design critics:
 
 ${evaluationsBundle}
 
@@ -799,7 +909,7 @@ const isMain = import.meta.url === `file://${process.argv[1]}`;
 if (isMain) {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
-    console.log(`\n🚀 Design Review Agents running on http://localhost:${PORT}`);
+    console.log(`\n🚀 Seance Symposium running on http://localhost:${PORT}`);
     console.log(`✓ API Key: ${process.env.ANTHROPIC_API_KEY ? "set" : "NOT SET"}`);
     console.log(`✓ Static files: ${publicPath}\n`);
   });

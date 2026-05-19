@@ -1,4 +1,4 @@
-# Design Review Agents - Setup Guide
+# Seance Symposium - Setup Guide
 
 ## Quick Start
 

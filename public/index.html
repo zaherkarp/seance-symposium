@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Design Review Agents</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/marked@13/marked.min.js"></script>
+  <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #e0e0e0;
+    }
+    input[type="text"],
+    input[type="password"],
+    textarea {
+      background: #1a1a1a;
+      color: #e0e0e0;
+      border: 1px solid #333;
+      padding: 10px 12px;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 13px;
+    }
+    input[type="text"]:focus,
+    input[type="password"]:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #d4504f;
+      box-shadow: 0 0 0 3px rgba(212, 80, 79, 0.1);
+    }
+    button {
+      background: #d4504f;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+    button:hover:not(:disabled) {
+      background: #c0403d;
+    }
+    button:disabled {
+      background: #666;
+      cursor: not-allowed;
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .markdown-body {
+      font-size: 14px;
+      line-height: 1.6;
+      color: #d8d8d8;
+    }
+    .markdown-body h1,
+    .markdown-body h2,
+    .markdown-body h3,
+    .markdown-body h4 {
+      color: #fff;
+      margin: 16px 0 8px;
+      font-weight: 600;
+    }
+    .markdown-body h1 { font-size: 20px; }
+    .markdown-body h2 { font-size: 17px; }
+    .markdown-body h3 { font-size: 15px; }
+    .markdown-body p { margin: 8px 0; }
+    .markdown-body ul,
+    .markdown-body ol { margin: 8px 0 8px 24px; }
+    .markdown-body li { margin: 4px 0; }
+    .markdown-body strong { color: #fff; }
+    .markdown-body em { color: #e8c476; }
+    .markdown-body code {
+      background: #0a0a0a;
+      padding: 2px 5px;
+      border-radius: 3px;
+      font-size: 12px;
+      color: #e8c476;
+    }
+    .markdown-body blockquote {
+      border-left: 3px solid #d4504f;
+      padding-left: 12px;
+      margin: 12px 0;
+      color: #bbb;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    const AGENTS = [
+      { id: 'tufte', name: 'Edward Tufte', icon: '📊', philosophy: 'Minimalism, clarity, precision' },
+      { id: 'rosling', name: 'Hans Rosling', icon: '🎬', philosophy: 'Narrative, engagement, accessibility' },
+      { id: 'bertin', name: 'Jacques Bertin', icon: '🧬', philosophy: 'Systematic rigor, perceptual science' },
+      { id: 'few', name: 'Stephen Few', icon: '⚙️', philosophy: 'Pragmatism, business value, performance' },
+      { id: 'shneiderman', name: 'Ben Shneiderman', icon: '🎮', philosophy: 'Interactivity, user agency, exploration' },
+      { id: 'inclusive', name: 'Inclusive Design', icon: '♿', philosophy: 'Accessibility, neurodiversity, cultural sensitivity' },
+    ];
+
+    const GRAD_STUDENTS = [
+      { id: 'tufte', name: 'Tufte Group', icon: '📊', label: 'Minimalism' },
+      { id: 'rosling', name: 'Rosling Group', icon: '🎬', label: 'Narrative' },
+      { id: 'bertin', name: 'Bertin Group', icon: '🧬', label: 'Semiotics' },
+      { id: 'few', name: 'Few Group', icon: '⚙️', label: 'Pragmatism' },
+      { id: 'shneiderman', name: 'Shneiderman Group', icon: '🎮', label: 'HCI' },
+      { id: 'inclusive', name: 'Inclusive Group', icon: '♿', label: 'Inclusive' },
+    ];
+
+    const SECTION_DEFS = [
+      { key: 'abstract', label: 'Abstract', icon: '📝' },
+      { key: 'findings', label: 'Key Findings', icon: '🔍' },
+      { key: 'conflicts', label: 'Disciplinary Conflicts', icon: '⚔️' },
+      { key: 'recommendations', label: 'Prioritized Recommendations', icon: '🎯' },
+      { key: 'conclusion', label: 'Conclusion', icon: '🏁' },
+    ];
+
+    function renderMarkdown(text) {
+      if (!text) return { __html: '' };
+      try {
+        return { __html: marked.parse(text, { breaks: true }) };
+      } catch (err) {
+        return { __html: text.replace(/</g, '&lt;') };
+      }
+    }
+
+    function presentationToMarkdown(presentation) {
+      const lines = [];
+      lines.push(`# ${presentation.name} — Semester Review`);
+      lines.push('');
+      lines.push(`*Discipline: ${presentation.discipline || ''}*`);
+      lines.push('');
+      SECTION_DEFS.forEach((section) => {
+        const body = presentation.sections?.[section.key];
+        if (!body) return;
+        lines.push(`## ${section.label}`);
+        lines.push('');
+        lines.push(body.trim());
+        lines.push('');
+      });
+      return lines.join('\n');
+    }
+
+    function downloadFile(filename, content, mime = 'text/markdown') {
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function downloadPresentationsZip(presentations) {
+      const zip = new JSZip();
+      presentations.forEach((p) => {
+        const filename = `${p.disciplineId || p.discipline || 'group'}-presentation.md`;
+        zip.file(filename, presentationToMarkdown(p));
+      });
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'design-review-presentations.zip';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function DesignReviewApp() {
+      const [step, setStep] = useState('input');
+      const [inputType, setInputType] = useState(null);
+      const [designBrief, setDesignBrief] = useState('');
+      const [imageUrls, setImageUrls] = useState('');
+      const [repoUrl, setRepoUrl] = useState('');
+      const [repoDepth, setRepoDepth] = useState('');
+      const [includeSynthesis, setIncludeSynthesis] = useState(true);
+
+      const [evaluations, setEvaluations] = useState([]);
+      const [report, setReport] = useState(null);
+      const [presentations, setPresentations] = useState(null);
+      const [activeTab, setActiveTab] = useState(null);
+      const [showRawData, setShowRawData] = useState(false);
+      const [error, setError] = useState('');
+      const [statusMessage, setStatusMessage] = useState('');
+
+      const buildContext = () => {
+        let context = '';
+        if (designBrief) context += `DESIGN BRIEF:\n${designBrief}\n\n`;
+        if (imageUrls) context += `IMAGE URLS:\n${imageUrls}\n\n`;
+        if (repoUrl) context += `REPOSITORY:\n${repoUrl}\nANALYSIS DEPTH: ${repoDepth || 'sample'}\n\n`;
+        return context || '(No design context provided)';
+      };
+
+      const resetResultsState = () => {
+        setEvaluations([]);
+        setReport(null);
+        setPresentations(null);
+        setActiveTab(null);
+        setShowRawData(false);
+      };
+
+      const showResults = (data) => {
+        setEvaluations(data.evaluations || []);
+        setReport(data.report || null);
+        if (Array.isArray(data.presentations) && data.presentations.length) {
+          setPresentations(data.presentations);
+          setActiveTab(data.presentations[0].disciplineId);
+        } else {
+          setPresentations(null);
+          setActiveTab(null);
+        }
+        setStep('results');
+      };
+
+      const runEvaluation = async () => {
+        if (!designBrief && !imageUrls && !repoUrl) {
+          setError('Please provide at least one input: text brief, image URLs, or repo');
+          return;
+        }
+        setError('');
+        resetResultsState();
+        setStatusMessage(includeSynthesis ? 'Running 6 critics, then 6 grad-student groups…' : 'Running 6 critics in parallel…');
+        setStep('evaluating');
+        try {
+          const response = await fetch('/api/evaluate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              context: buildContext(),
+              repoUrl: repoUrl || '',
+              repoDepth: repoDepth || 'sample',
+              includeSynthesis,
+            }),
+          });
+          if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || 'Evaluation failed');
+          }
+          const data = await response.json();
+          showResults(data);
+        } catch (err) {
+          setError(err.message);
+          setStep('input');
+        }
+      };
+
+      const runFixtureSynthesis = async () => {
+        setError('');
+        resetResultsState();
+        setStatusMessage('Loading fixture and running 6 grad-student groups…');
+        setStep('evaluating');
+        try {
+          const fixtureResp = await fetch('/api/fixture');
+          if (!fixtureResp.ok) {
+            const data = await fixtureResp.json().catch(() => ({}));
+            throw new Error(data.error || 'Fixture not found');
+          }
+          const fixture = await fixtureResp.json();
+          const synthResp = await fetch('/api/synthesize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ useFixture: true }),
+          });
+          if (!synthResp.ok) {
+            const data = await synthResp.json();
+            throw new Error(data.error || 'Synthesis failed');
+          }
+          const synth = await synthResp.json();
+          showResults({
+            evaluations: fixture.evaluations || [],
+            report: fixture.report || null,
+            presentations: synth.presentations || [],
+          });
+        } catch (err) {
+          setError(err.message);
+          setStep('input');
+        }
+      };
+
+      const newEvaluation = () => {
+        setStep('input');
+        setDesignBrief('');
+        setImageUrls('');
+        setRepoUrl('');
+        setRepoDepth('');
+        resetResultsState();
+        setError('');
+      };
+
+      // ---- INPUT STEP ----
+      if (step === 'input') {
+        return (
+          <div style={{ minHeight: '100vh', padding: '40px 20px' }}>
+            <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+              <h1 style={{ fontSize: '36px', fontWeight: 300, margin: '0 0 8px 0', letterSpacing: '-0.5px' }}>
+                Design Review Agents
+              </h1>
+              <p style={{ fontSize: '14px', color: '#999', margin: '0 0 32px 0' }}>
+                6 critics evaluate your design in parallel. 6 grad-student groups synthesize the results
+                into discipline-specific presentations.
+              </p>
+
+              {error && (
+                <div style={{
+                  marginBottom: '24px', padding: '12px', background: '#3d1515',
+                  border: '1px solid #d4504f', borderRadius: '6px', fontSize: '13px', color: '#ff9999',
+                }}>
+                  {error}
+                </div>
+              )}
+
+              <div style={{ marginBottom: '24px' }}>
+                <p style={{ fontSize: '13px', fontWeight: 600, color: '#ccc', margin: '0 0 12px 0' }}>What are you designing?</p>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {[
+                    { type: 'text', label: '📝 Text Brief' },
+                    { type: 'image', label: '🖼️ Screenshots/Mockups' },
+                    { type: 'repo', label: '🔗 Git Repository' },
+                  ].map(item => (
+                    <button
+                      key={item.type}
+                      onClick={() => setInputType(inputType === item.type ? null : item.type)}
+                      style={{
+                        padding: '8px 12px',
+                        background: inputType === item.type ? '#d4504f' : '#333',
+                        color: '#fff', border: 'none', borderRadius: '4px',
+                        cursor: 'pointer', fontSize: '13px', fontWeight: 500,
+                      }}
+                    >{item.label}</button>
+                  ))}
+                </div>
+              </div>
+
+              {inputType === 'text' && (
+                <textarea
+                  placeholder="Describe the design brief, its purpose, target audience, constraints, goals…"
+                  value={designBrief}
+                  onChange={(e) => setDesignBrief(e.target.value)}
+                  style={{ width: '100%', height: '140px', marginBottom: '16px' }}
+                />
+              )}
+
+              {inputType === 'image' && (
+                <input
+                  type="text"
+                  placeholder="https://example.com/image1.png, https://example.com/image2.png"
+                  value={imageUrls}
+                  onChange={(e) => setImageUrls(e.target.value)}
+                  style={{ width: '100%', marginBottom: '16px' }}
+                />
+              )}
+
+              {inputType === 'repo' && (
+                <>
+                  <input
+                    type="text"
+                    placeholder="https://github.com/user/repo"
+                    value={repoUrl}
+                    onChange={(e) => setRepoUrl(e.target.value)}
+                    style={{ width: '100%', marginBottom: '12px' }}
+                  />
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                    {[
+                      { depth: 'sample', label: '📋 Sample' },
+                      { depth: 'full', label: '🔍 Full' },
+                    ].map(item => (
+                      <button
+                        key={item.depth}
+                        onClick={() => setRepoDepth(repoDepth === item.depth ? '' : item.depth)}
+                        style={{
+                          flex: 1, padding: '8px 12px',
+                          background: repoDepth === item.depth ? '#27ae60' : '#333',
+                          color: '#fff', border: 'none', borderRadius: '4px',
+                          cursor: 'pointer', fontSize: '12px',
+                        }}
+                      >{item.label}</button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '12px', background: '#1a1a1a', border: '1px solid #333',
+                borderRadius: '6px', marginBottom: '16px', cursor: 'pointer',
+              }}>
+                <input
+                  type="checkbox"
+                  checked={includeSynthesis}
+                  onChange={(e) => setIncludeSynthesis(e.target.checked)}
+                  style={{ width: '16px', height: '16px' }}
+                />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 600 }}>Run grad-student synthesis</div>
+                  <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>
+                    After the 6 critics finish, 6 discipline groups produce semester-style presentations. Adds ~30–60s.
+                  </div>
+                </div>
+              </label>
+
+              <button
+                onClick={runEvaluation}
+                disabled={!designBrief && !imageUrls && !repoUrl}
+                style={{
+                  width: '100%', padding: '14px',
+                  background: designBrief || imageUrls || repoUrl ? '#d4504f' : '#666',
+                  fontSize: '14px', fontWeight: 600,
+                  cursor: designBrief || imageUrls || repoUrl ? 'pointer' : 'not-allowed',
+                  marginBottom: '12px',
+                }}
+              >▶️ Run Evaluation</button>
+
+              <button
+                onClick={runFixtureSynthesis}
+                style={{
+                  width: '100%', padding: '12px',
+                  background: '#2a2a2a', color: '#ccc',
+                  border: '1px dashed #555', fontSize: '12px', fontWeight: 500,
+                }}
+              >🧪 Synthesize from fixture (skip critics)</button>
+              <div style={{ fontSize: '11px', color: '#666', marginTop: '6px', textAlign: 'center' }}>
+                Uses design-review-evaluation.json on disk. Useful for iterating on the synthesis prompts.
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // ---- EVALUATING STEP ----
+      if (step === 'evaluating') {
+        return (
+          <div style={{
+            minHeight: '100vh', display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '48px', marginBottom: '16px', animation: 'spin 2s linear infinite' }}>🔄</div>
+              <h2 style={{ margin: '0 0 8px 0', fontSize: '20px' }}>Evaluating…</h2>
+              <p style={{ margin: 0, fontSize: '13px', color: '#999' }}>{statusMessage}</p>
+            </div>
+          </div>
+        );
+      }
+
+      // ---- RESULTS STEP ----
+      return (
+        <div style={{ minHeight: '100vh', padding: '40px 20px' }}>
+          <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+            <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 300 }}>Evaluation Results</h1>
+                <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: '#999' }}>
+                  {presentations
+                    ? `${presentations.length} discipline presentations · ${evaluations.length} critic evaluations`
+                    : `${evaluations.length} critic evaluations`}
+                </p>
+              </div>
+              <button onClick={newEvaluation} style={{
+                padding: '8px 16px', background: '#333', color: '#e0e0e0',
+                fontSize: '12px',
+              }}>↻ New Evaluation</button>
+            </div>
+
+            {presentations
+              ? <PresentationView
+                  presentations={presentations}
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                  showRawData={showRawData}
+                  setShowRawData={setShowRawData}
+                  evaluations={evaluations}
+                  report={report}
+                />
+              : <RawDataView evaluations={evaluations} report={report} />
+            }
+          </div>
+        </div>
+      );
+    }
+
+    function PresentationView({ presentations, activeTab, setActiveTab, showRawData, setShowRawData, evaluations, report }) {
+      const active = presentations.find((p) => p.disciplineId === activeTab) || presentations[0];
+
+      return (
+        <>
+          <div style={{
+            display: 'flex', gap: '4px', marginBottom: '24px',
+            flexWrap: 'wrap', borderBottom: '1px solid #333', paddingBottom: '12px',
+          }}>
+            {presentations.map((p) => {
+              const isActive = p.disciplineId === active.disciplineId;
+              return (
+                <button
+                  key={p.disciplineId}
+                  onClick={() => setActiveTab(p.disciplineId)}
+                  style={{
+                    padding: '10px 14px',
+                    background: isActive ? '#d4504f' : '#1a1a1a',
+                    color: isActive ? '#fff' : '#bbb',
+                    border: isActive ? '1px solid #d4504f' : '1px solid #333',
+                    fontSize: '13px',
+                    fontWeight: isActive ? 600 : 500,
+                  }}
+                >{p.icon} {p.name.replace(' Group', '')}</button>
+              );
+            })}
+          </div>
+
+          {active && <PresentationCard presentation={active} allPresentations={presentations} />}
+
+          <div style={{ marginTop: '32px', borderTop: '1px solid #333', paddingTop: '20px' }}>
+            <button
+              onClick={() => setShowRawData(!showRawData)}
+              style={{
+                background: '#1a1a1a', color: '#999', border: '1px solid #333',
+                fontSize: '12px', fontWeight: 500, padding: '8px 14px',
+              }}
+            >
+              {showRawData ? '▼' : '▶'} Raw critic data ({evaluations.length} scorecards, ranked-choice voting, conflict map)
+            </button>
+            {showRawData && (
+              <div style={{ marginTop: '20px' }}>
+                <RawDataView evaluations={evaluations} report={report} />
+              </div>
+            )}
+          </div>
+        </>
+      );
+    }
+
+    function PresentationCard({ presentation, allPresentations }) {
+      const [copyState, setCopyState] = useState('');
+      const markdown = useMemo(() => presentationToMarkdown(presentation), [presentation]);
+      const hasError = !!presentation.error;
+
+      const copyMarkdown = async () => {
+        try {
+          await navigator.clipboard.writeText(markdown);
+          setCopyState('copied');
+          setTimeout(() => setCopyState(''), 1500);
+        } catch (err) {
+          setCopyState('failed');
+          setTimeout(() => setCopyState(''), 1500);
+        }
+      };
+
+      const downloadMarkdown = () => {
+        downloadFile(`${presentation.disciplineId}-presentation.md`, markdown);
+      };
+
+      const downloadAll = () => {
+        downloadPresentationsZip(allPresentations).catch((err) => {
+          console.error('ZIP export failed', err);
+        });
+      };
+
+      return (
+        <div style={{ background: '#141414', border: '1px solid #2a2a2a', borderRadius: '10px', padding: '28px' }}>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between',
+            alignItems: 'flex-start', gap: '16px', marginBottom: '24px',
+            paddingBottom: '20px', borderBottom: '1px solid #2a2a2a',
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                <span style={{ fontSize: '28px' }}>{presentation.icon}</span>
+                <h2 style={{ fontSize: '22px', fontWeight: 600, margin: 0 }}>{presentation.name}</h2>
+              </div>
+              <div style={{ fontSize: '12px', color: '#999' }}>
+                Semester project · {presentation.discipline}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                onClick={copyMarkdown}
+                style={{ padding: '8px 12px', background: '#2a7ae2', fontSize: '12px' }}
+              >
+                {copyState === 'copied' ? '✓ Copied' : copyState === 'failed' ? '✗ Failed' : '📋 Copy markdown'}
+              </button>
+              <button
+                onClick={downloadMarkdown}
+                style={{ padding: '8px 12px', background: '#27ae60', fontSize: '12px' }}
+              >💾 .md</button>
+              <button
+                onClick={downloadAll}
+                style={{ padding: '8px 12px', background: '#7d4ad4', fontSize: '12px' }}
+              >📦 Download all (ZIP)</button>
+            </div>
+          </div>
+
+          {hasError && (
+            <div style={{
+              padding: '12px', background: '#3d1515', border: '1px solid #d4504f',
+              borderRadius: '6px', color: '#ff9999', fontSize: '13px', marginBottom: '16px',
+            }}>⚠️ {presentation.error}</div>
+          )}
+
+          {SECTION_DEFS.map((section) => {
+            const body = presentation.sections?.[section.key];
+            return (
+              <div key={section.key} style={{ marginBottom: '24px' }}>
+                <h3 style={{
+                  fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px',
+                  color: '#d4504f', margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '8px',
+                }}>
+                  <span>{section.icon}</span> {section.label}
+                </h3>
+                {body
+                  ? <div className="markdown-body" dangerouslySetInnerHTML={renderMarkdown(body)} />
+                  : <div style={{ fontSize: '13px', color: '#666', fontStyle: 'italic' }}>
+                      (Section missing from this group's presentation.)
+                    </div>
+                }
+              </div>
+            );
+          })}
+
+          <details style={{
+            marginTop: '24px', padding: '12px', background: '#0a0a0a',
+            border: '1px solid #2a2a2a', borderRadius: '6px',
+          }}>
+            <summary style={{ fontSize: '12px', color: '#888', cursor: 'pointer', userSelect: 'none' }}>
+              Show raw model output
+            </summary>
+            <pre style={{
+              marginTop: '12px', whiteSpace: 'pre-wrap', fontSize: '11px',
+              lineHeight: 1.5, color: '#aaa', fontFamily: 'monospace',
+            }}>{presentation.response || '(no output)'}</pre>
+          </details>
+        </div>
+      );
+    }
+
+    function RawDataView({ evaluations, report }) {
+      const [showConflictMap, setShowConflictMap] = useState(false);
+      const [showDeliberation, setShowDeliberation] = useState(false);
+
+      const rankedProposals = report?.topRecommendations || [];
+
+      const conflictData = (report?.conflictPairs || []).map((pair) => ({
+        agent1: AGENTS.find((a) => a.id === pair.agentA),
+        agent2: AGENTS.find((a) => a.id === pair.agentB),
+        delta: pair.delta != null ? Number(pair.delta).toFixed(1) : 'N/A',
+      })).filter((c) => c.agent1 && c.agent2);
+
+      return (
+        <>
+          {report && (
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
+              <button
+                onClick={() => { if (report.iterationPrompt) navigator.clipboard.writeText(report.iterationPrompt); }}
+                style={{ padding: '8px 12px', background: '#2a7ae2', fontSize: '12px' }}
+              >📋 Copy Iteration Prompt</button>
+              <button
+                onClick={() => setShowDeliberation(!showDeliberation)}
+                style={{ padding: '8px 12px', background: showDeliberation ? '#d4504f' : '#333', fontSize: '12px' }}
+              >{showDeliberation ? '✓' : ''} Deliberation</button>
+              <button
+                onClick={() => setShowConflictMap(!showConflictMap)}
+                style={{ padding: '8px 12px', background: showConflictMap ? '#d4504f' : '#333', fontSize: '12px' }}
+              >{showConflictMap ? '✓' : ''} Conflict Map</button>
+            </div>
+          )}
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+            gap: '16px', marginBottom: '32px',
+          }}>
+            {evaluations.map((e) => {
+              const agent = AGENTS.find((a) => a.id === e.agentId) || { name: e.name, icon: '❔', philosophy: '' };
+              const scores = (e.parsed?.scores || []).map((s) => Number(s.score)).filter((n) => !Number.isNaN(n));
+              const avgScore = scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) : 'N/A';
+              const proposals = e.parsed?.improvements || [];
+              const summary = e.parsed?.summary || '';
+              return (
+                <div key={e.agentId} style={{
+                  background: '#1a1a1a', border: '1px solid #333',
+                  borderRadius: '8px', padding: '20px',
+                }}>
+                  <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', alignItems: 'center' }}>
+                    <div style={{ fontSize: '32px' }}>{agent.icon}</div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>{agent.name}</h3>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#999' }}>{agent.philosophy}</p>
+                    </div>
+                  </div>
+                  {e.error ? (
+                    <div style={{ fontSize: '12px', color: '#d4504f' }}>⚠️ {e.error}</div>
+                  ) : (
+                    <>
+                      <div style={{
+                        background: '#0f0f0f', padding: '12px',
+                        borderRadius: '4px', marginBottom: '12px', textAlign: 'center',
+                      }}>
+                        <div style={{ fontSize: '11px', color: '#999', marginBottom: '4px' }}>Average Score</div>
+                        <div style={{ fontSize: '24px', fontWeight: 600, color: '#d4504f' }}>{avgScore}/10</div>
+                      </div>
+                      {summary && (
+                        <div style={{ fontSize: '12px', color: '#ccc', marginBottom: '12px' }}>
+                          <div style={{ fontWeight: 600, marginBottom: '6px', color: '#e0e0e0' }}>Summary</div>
+                          <div style={{ lineHeight: 1.5 }}>{summary}</div>
+                        </div>
+                      )}
+                      <div style={{ fontSize: '12px', color: '#ccc' }}>
+                        <div style={{ fontWeight: 600, marginBottom: '8px', color: '#e0e0e0' }}>Top Proposals</div>
+                        {proposals.length === 0 && (
+                          <div style={{ color: '#777', fontStyle: 'italic' }}>(none parsed)</div>
+                        )}
+                        {proposals.slice(0, 3).map((p, idx) => (
+                          <div key={idx} style={{ marginBottom: '8px', lineHeight: 1.4 }}>
+                            <span style={{ color: '#d4504f', fontWeight: 500 }}>#{idx + 1}</span> {p}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {rankedProposals.length > 0 && (
+            <div style={{
+              background: '#1a1a1a', border: '1px solid #333',
+              borderRadius: '8px', padding: '24px', marginBottom: '24px',
+            }}>
+              <h2 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600 }}>Ranked Choice Voting</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                {rankedProposals.slice(0, 5).map((item, idx) => (
+                  <div key={idx} style={{
+                    background: '#0f0f0f', border: '1px solid #333',
+                    borderRadius: '6px', padding: '16px',
+                  }}>
+                    <div style={{ fontSize: '24px', fontWeight: 600, color: '#d4504f', marginBottom: '12px' }}>
+                      #{idx + 1}
+                    </div>
+                    <div style={{ fontSize: '13px', lineHeight: 1.6, marginBottom: '12px' }}>{item.proposal}</div>
+                    <div style={{ fontSize: '12px', color: '#999' }}>
+                      Support: <strong style={{ color: '#e0e0e0' }}>{item.score}</strong> pts
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {showConflictMap && conflictData.length > 0 && (
+            <div style={{
+              background: '#1a1a1a', border: '1px solid #333',
+              borderRadius: '8px', padding: '24px', marginBottom: '24px',
+            }}>
+              <h2 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600 }}>Conflict Map</h2>
+              <div style={{ display: 'grid', gap: '12px' }}>
+                {conflictData.map((c, idx) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 600 }}>{c.agent1.name}</span>
+                        <div style={{ flex: 1, height: '3px', background: '#333', borderRadius: '2px' }}>
+                          <div style={{
+                            height: '100%', width: `${(parseFloat(c.delta) / 10) * 100}%`,
+                            background: '#d4504f', borderRadius: '2px',
+                          }} />
+                        </div>
+                        <span style={{ fontSize: '11px', fontWeight: 600 }}>{c.agent2.name}</span>
+                      </div>
+                      <div style={{ fontSize: '10px', color: '#999' }}>Δ {c.delta}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {showDeliberation && (
+            <div style={{ marginBottom: '24px' }}>
+              <h2 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600 }}>Full Deliberation</h2>
+              <div style={{ display: 'grid', gap: '12px' }}>
+                {evaluations.map((e) => {
+                  const agent = AGENTS.find((a) => a.id === e.agentId) || { name: e.name, icon: '❔' };
+                  return (
+                    <details key={e.agentId} style={{
+                      background: '#1a1a1a', border: '1px solid #333',
+                      borderRadius: '6px', padding: '16px', cursor: 'pointer',
+                    }}>
+                      <summary style={{ fontWeight: 600, userSelect: 'none', color: '#d4504f' }}>
+                        {agent.icon} {agent.name}
+                      </summary>
+                      <div style={{
+                        marginTop: '12px', fontSize: '12px', lineHeight: 1.6,
+                        color: '#ccc', whiteSpace: 'pre-wrap', fontFamily: 'monospace',
+                      }}>{e.response || '(no response)'}</div>
+                    </details>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<DesignReviewApp />);
+  </script>
+</body>
+</html>

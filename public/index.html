@@ -170,6 +170,274 @@
       }
     }
 
+    // ---- Symposium presentation data derivation ----
+    const PANELS = [
+      { name: 'I · Minimalism vs. Narrative', pair: ['tufte', 'rosling'],
+        q: 'How can we tell a clear story without unnecessary decoration?' },
+      { name: 'II · Rigor vs. Expressiveness', pair: ['bertin', 'posavec'],
+        q: 'Can we be both systematic and emotionally resonant?' },
+      { name: 'III · Data Structure vs. Human Feeling', pair: ['hadley', 'lupi'],
+        q: 'How do we encode structure without losing humanity?' },
+      { name: 'IV · Pragmatism vs. Human Care', pair: ['few', 'norman'],
+        q: 'Can we be both efficient and caring?' },
+      { name: 'V · Control vs. Exploration', pair: ['shneiderman', 'bostock'],
+        q: 'How can users explore without getting lost?' },
+      { name: 'VI · Open Science vs. Excellence', pair: ['chamberlain', 'wilke'],
+        q: 'How do we balance openness with excellence?' },
+      { name: 'Editorial · Reportage vs. Reduction', pair: ['cox', 'tufte'],
+        q: 'When does clarity require restraint vs. context?' },
+    ];
+
+    const PHILOSOPHY_SHORT = {
+      tufte: 'Remove all non-essential ink.',
+      rosling: 'Engage audiences through story.',
+      bertin: 'Semiotic correctness & visual grammar.',
+      few: 'Business ROI & maintainability.',
+      shneiderman: 'User agency & direct manipulation.',
+      norman: 'Match the user\'s mental model.',
+      maeda: 'Beauty through clarity and computation.',
+      lupi: 'Data humanism & empathetic annotation.',
+      felton: 'Personal data, longitudinal craft.',
+      krug: 'Don\'t make me think.',
+      posavec: 'Handcrafted, personal expression.',
+      stefaner: 'Perceptual systems, exploratory rigor.',
+      bremer: 'Beautiful and rigorous storytelling.',
+      cox: 'Editorial clarity, reader first.',
+      bostock: 'Web-native, expressive code.',
+      vinh: 'Strong systems, polished hierarchy.',
+      hadley: 'Tidy data, grammar-of-graphics.',
+      bryan: 'Reproducible, collaborative workflows.',
+      yihui: 'Literate documents, dynamic reporting.',
+      wilke: 'Perceptual fidelity, statistical honesty.',
+      chamberlain: 'Open science, community standards.',
+      inclusive: 'Accessibility for all users.',
+    };
+
+    function extractPullQuote(evaluation) {
+      const raw = (evaluation && (evaluation.response || evaluation.parsed?.raw)) || '';
+      if (!raw) return evaluation?.parsed?.summary || '(no critique surfaced)';
+      const paragraphs = raw.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+      for (const p of paragraphs) {
+        if (/^#{1,6}\s/.test(p)) continue;
+        if (/^SCORES?\s*:/i.test(p)) break;
+        if (/^PROPOSALS?\s*:/i.test(p)) break;
+        if (/^---+\s*$/.test(p)) continue;
+        if (/^\*\*\d+\.\s/.test(p)) continue;
+        if (/^\d+\.\s+\*\*/.test(p)) continue;
+        const cleaned = p
+          .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+          .replace(/[*_`]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        if (cleaned.length < 60) continue;
+        const sentences = cleaned.match(/[^.!?]+[.!?]+/g) || [cleaned];
+        let result = sentences.slice(0, 2).join(' ').trim();
+        if (result.length > 280) result = result.slice(0, 277) + '…';
+        return result;
+      }
+      const fallback = (evaluation.parsed?.summary || '').replace(/[*_`#]/g, '').trim();
+      return fallback || '(no critique surfaced)';
+    }
+
+    function agentScores(evaluation) {
+      const arr = (evaluation?.parsed?.scores || [])
+        .map((s) => Number(s.score))
+        .filter((n) => !Number.isNaN(n));
+      return arr;
+    }
+
+    function agentComposite(evaluation) {
+      const arr = agentScores(evaluation);
+      if (!arr.length) return null;
+      const sum = arr.reduce((a, b) => a + b, 0);
+      // 5 dims per agent in this app -> /50. If fewer present, scale.
+      return Math.round((sum / arr.length) * 5);
+    }
+
+    function agentEnriched(evaluation) {
+      const meta = AGENTS.find((a) => a.id === evaluation.agentId) || {
+        id: evaluation.agentId, name: evaluation.name, icon: '❔', philosophy: '',
+      };
+      const composite = agentComposite(evaluation);
+      const scores = agentScores(evaluation);
+      const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+      return {
+        id: meta.id,
+        name: meta.name,
+        icon: meta.icon,
+        philosophy: PHILOSOPHY_SHORT[meta.id] || meta.philosophy || '',
+        quote: extractPullQuote(evaluation),
+        score: composite,
+        scoreMax: 50,
+        avg,
+      };
+    }
+
+    function firstSentence(text) {
+      if (!text) return '';
+      const cleaned = String(text).replace(/[*_`]/g, '').replace(/\s+/g, ' ').trim();
+      const m = cleaned.match(/[^.!?]+[.!?]/);
+      const out = (m ? m[0] : cleaned).trim();
+      return out.length > 220 ? out.slice(0, 217) + '…' : out;
+    }
+
+    function derivePresentationData(evaluations, report, opts = {}) {
+      const presentations = Array.isArray(opts.presentations) ? opts.presentations : [];
+      const enriched = {};
+      const avgs = [];
+      evaluations.forEach((e) => {
+        if (!e || e.error) return;
+        const ag = agentEnriched(e);
+        enriched[e.agentId] = ag;
+        if (ag.avg !== null) avgs.push(ag.avg);
+      });
+
+      const overallAvg = avgs.length ? avgs.reduce((a, b) => a + b, 0) / avgs.length : 0;
+      const composite = Math.round(overallAvg * 5);
+
+      // Lead quote: harshest critic's pull-quote
+      const harshest = Object.values(enriched)
+        .filter((e) => e.avg !== null)
+        .sort((a, b) => a.avg - b.avg)[0];
+      const leadQuote = (harshest && harshest.quote) || 'The verdict is in.';
+
+      // Debates: prefer canonical panels where both agents present, then fill with
+      // biggest deltas between unused agents.
+      const debates = [];
+      const used = new Set();
+      PANELS.forEach((p) => {
+        if (debates.length >= 3) return;
+        const L = enriched[p.pair[0]];
+        const R = enriched[p.pair[1]];
+        if (!L || !R) return;
+        if (used.has(L.id) || used.has(R.id)) return;
+        debates.push({
+          panel: p.name,
+          left: L,
+          right: R,
+          consensusQ: p.q,
+        });
+        used.add(L.id); used.add(R.id);
+      });
+
+      if (debates.length < 3) {
+        const remaining = Object.values(enriched)
+          .filter((e) => !used.has(e.id) && e.avg !== null)
+          .sort((a, b) => a.avg - b.avg);
+        while (debates.length < 3 && remaining.length >= 2) {
+          const low = remaining.shift();
+          const high = remaining.pop();
+          debates.push({
+            panel: `Improvised · ${low.name} vs ${high.name}`,
+            left: low,
+            right: high,
+            consensusQ: 'Where do these voices converge?',
+          });
+        }
+      }
+
+      const topProposals = (report?.topRecommendations || [])
+        .slice(0, 3)
+        .map((r, i) => {
+          const backers = [];
+          evaluations.forEach((e) => {
+            const props = e?.parsed?.improvements || [];
+            if (props.some((p) => p && p.trim() === r.proposal)) {
+              const meta = AGENTS.find((a) => a.id === e.agentId);
+              if (meta) backers.push({ id: meta.id, name: meta.name.split(' ').slice(-1)[0] });
+            }
+          });
+          return {
+            rank: i + 1,
+            votes: Math.round(r.score || 0),
+            text: (r.proposal || '').replace(/[*_`]/g, '').trim(),
+            backers,
+          };
+        })
+        .filter((p) => p.text && p.text.length > 8);
+
+      const conflicts = (report?.conflictPairs || [])
+        .slice(0, 4)
+        .map((p) => {
+          const A = AGENTS.find((a) => a.id === p.agentA);
+          const B = AGENTS.find((a) => a.id === p.agentB);
+          return {
+            left:  { id: A?.id || p.agentA, name: A ? A.name.split(' ').slice(-1)[0] : p.agentA, role: A?.philosophy?.split(/[,.]/)[0] || '' },
+            right: { id: B?.id || p.agentB, name: B ? B.name.split(' ').slice(-1)[0] : p.agentB, role: B?.philosophy?.split(/[,.]/)[0] || '' },
+            delta: Number(p.delta).toFixed(1),
+          };
+        });
+
+      const roster = evaluations
+        .filter((e) => !e.error)
+        .map((e) => {
+          const meta = AGENTS.find((a) => a.id === e.agentId) || { id: e.agentId, name: e.name, icon: '❔' };
+          return {
+            id: meta.id,
+            icon: meta.icon,
+            name: meta.name.split(' ').slice(-1)[0],
+            score: agentComposite(e),
+          };
+        });
+
+      const groupSummaries = presentations
+        .filter((p) => p && !p.error && p.sections?.abstract)
+        .map((p) => ({
+          id: p.disciplineId,
+          icon: p.icon || '🎓',
+          name: (p.name || '').replace(/\s+Group$/i, ''),
+          discipline: p.discipline || '',
+          take: firstSentence(p.sections.abstract),
+        }));
+
+      const synthesisActions = (report?.topRecommendations || [])
+        .slice(0, 4)
+        .map((r) => (r.proposal || '').replace(/[*_`]/g, '').trim())
+        .filter(Boolean);
+      const synthTitle = synthesisActions.length
+        ? synthesisActions[0].length > 80 ? synthesisActions[0].slice(0, 77) + '…' : synthesisActions[0]
+        : 'The Symposium adjourns.';
+
+      return {
+        target: opts.target || '',
+        composite,
+        compositeMax: 50,
+        leadQuote,
+        meta: {
+          agents: evaluations.length,
+          conflicts: (report?.conflictPairs || []).length,
+          proposals: (report?.topRecommendations || []).length,
+        },
+        roster,
+        debates,
+        topProposals,
+        conflicts,
+        groupSummaries,
+        synthesis: {
+          title: synthTitle,
+          actions: synthesisActions,
+        },
+        links: {
+          source: opts.target && /^https?:\/\//.test(opts.target) ? opts.target : '',
+          deliberation: opts.deliberationUrl || '',
+        },
+      };
+    }
+
+    function launchSymposium(evaluations, report, target, presentations) {
+      const data = derivePresentationData(evaluations, report, {
+        target,
+        presentations,
+        deliberationUrl: window.location.origin + '/',
+      });
+      try {
+        localStorage.setItem('symposium-data', JSON.stringify(data));
+      } catch (err) {
+        console.warn('Could not persist symposium data:', err);
+      }
+      window.open('/symposium-presentation.html', '_blank', 'noopener');
+    }
+
     function presentationToMarkdown(presentation) {
       const lines = [];
       lines.push(`# ${presentation.name} — Semester Review`);
@@ -495,7 +763,7 @@
       return (
         <div style={{ minHeight: '100vh', padding: '40px 20px' }}>
           <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-            <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
               <div>
                 <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 300 }}>Evaluation Results</h1>
                 <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: '#999' }}>
@@ -504,10 +772,23 @@
                     : `${evaluations.length} critic evaluations`}
                 </p>
               </div>
-              <button onClick={newEvaluation} style={{
-                padding: '8px 16px', background: '#333', color: '#e0e0e0',
-                fontSize: '12px',
-              }}>↻ New Evaluation</button>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => launchSymposium(evaluations, report, repoUrl || (designBrief ? designBrief.slice(0, 60) : '') || imageUrls, presentations)}
+                  disabled={!evaluations.length}
+                  style={{
+                    padding: '10px 16px',
+                    background: evaluations.length ? '#7d4ad4' : '#444',
+                    color: '#fff', fontSize: '13px', fontWeight: 600,
+                    cursor: evaluations.length ? 'pointer' : 'not-allowed',
+                  }}
+                  title="Open the auto-playing curated presentation in a new tab"
+                >🎭 Play Symposium Presentation</button>
+                <button onClick={newEvaluation} style={{
+                  padding: '8px 16px', background: '#333', color: '#e0e0e0',
+                  fontSize: '12px',
+                }}>↻ New Evaluation</button>
+              </div>
             </div>
 
             {presentations

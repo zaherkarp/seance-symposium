@@ -46,7 +46,7 @@ The app will start on `http://localhost:3000`
    - Image URLs (screenshots, mockups)
    - Git repo URL (with sample or full codebase analysis)
 
-2. **Run evaluation**: All 6 agents evaluate in parallel
+2. **Run evaluation**: All agents evaluate in parallel
 
 3. **View results**:
    - Agent scores and top proposals
@@ -54,16 +54,135 @@ The app will start on `http://localhost:3000`
    - Conflict map (where agents disagree most)
    - Full deliberation (read each agent's full analysis)
 
-## The 6 Agents
+## The Agents
 
 - **Edward Tufte** (📊): Minimalism, clarity, precision, data-ink ratio
 - **Hans Rosling** (🎬): Narrative, engagement, accessibility, story
 - **Jacques Bertin** (🧬): Systematic rigor, semiotic correctness, perceptual science
 - **Stephen Few** (⚙️): Pragmatism, business value, performance, maintainability
 - **Ben Shneiderman** (🎮): Interactivity, user agency, exploration, control
+- **Don Norman** (🧠): Human-centered usability, affordances, mental models
+- **John Maeda** (💻): Computational design, digital elegance, systems thinking
+- **Giorgia Lupi** (✍️): Data humanism, narrative meaning, empathetic annotation
+- **Nicholas Felton** (🗓️): Personal data storytelling, craft, longitudinal narrative
+- **Steve Krug** (🖱️): Web usability, scanability, clear actions
+- **Stefanie Posavec** (🎨): Handcrafted data art, personal expression, tactile storytelling
+- **Moritz Stefaner** (🔬): Research visualization, perceptual systems, interaction design
+- **Nadieh Bremer** (🌟): Creative data storytelling, publication-quality visuals
+- **Amanda Cox** (📰): Editorial visualization and journalistic clarity
+- **Mike Bostock** (🕸️): Web-native visualization, interaction, D3-style expressiveness
+- **Khoi Vinh** (🧩): Interface systems, editorial digital presence, polished hierarchy
+- **Hadley Wickham** (📦): Tidy data, grammar-of-graphics, reproducible pipelines
+- **Jenny Bryan** (🔧): Reproducible workflows, project structure, data tooling
+- **Yihui Xie** (📚): Reproducible documents, literate programming, dynamic reporting
+- **Claus O. Wilke** (🔎): Statistical graphics, perceptual best-practices
+- **Scott Chamberlain** (🔍): Open science, community tools, data standards, transparency
 - **Inclusive Design** (♿): Accessibility, neurodiversity, cultural sensitivity
 
-## Evaluating Git Repos
+## Antagonistic Discussion Panels
+
+The agents are grouped into **deliberative panels** designed to create productive tension and reach consensus through diverse perspectives:
+
+### Panel 1: Minimalism vs. Narrative
+**Tension**: Data-driven reduction vs. engagement-first storytelling
+
+| Persona | Philosophy | Characteristic Critique |
+|---------|-----------|--------------------------|
+| **Tufte** | *Remove all non-essential ink* | "This is over-decorated" |
+| **Rosling** | *Engage audiences through story* | "This is emotionally inert" |
+
+**Consensus Question**: *How can we tell a clear story without unnecessary decoration?*
+
+---
+
+### Panel 2: Rigor vs. Expressiveness
+**Tension**: Systematic encoding rules vs. artistic freedom
+
+| Persona | Philosophy | Characteristic Critique |
+|---------|-----------|--------------------------|
+| **Bertin** | *Semiotic correctness & visual grammar* | "Visual variables are inconsistently mapped" |
+| **Posavec** | *Handcrafted, personal expression* | "This feels designed-by-committee and soulless" |
+
+**Consensus Question**: *Can we be both systematic and emotionally resonant?*
+
+---
+
+### Panel 3: Data Structure vs. Human Feeling
+**Tension**: Reproducible pipelines vs. qualitative meaning
+
+| Persona | Philosophy | Characteristic Critique |
+|---------|-----------|--------------------------|
+| **Hadley** | *Tidy data & grammar-of-graphics* | "This is not reproducible from source data" |
+| **Lupi** | *Data humanism & empathetic annotation* | "Where is the human story in these metrics?" |
+
+**Consensus Question**: *How do we encode structure without losing humanity?*
+
+---
+
+### Panel 4: Pragmatism vs. Human Care
+**Tension**: Business value & performance vs. holistic user experience
+
+| Persona | Philosophy | Characteristic Critique |
+|---------|-----------|--------------------------|
+| **Few** | *Business ROI & maintainability* | "This is overengineered for the audience" |
+| **Norman** | *Human psychology & affordances* | "This ignores how people actually think" |
+
+**Consensus Question**: *Can we be both efficient and caring?*
+
+---
+
+### Panel 5: Control vs. Exploration
+**Tension**: User agency & reversibility vs. computational expressiveness
+
+| Persona | Philosophy | Characteristic Critique |
+|---------|-----------|--------------------------|
+| **Shneiderman** | *User agency & direct manipulation* | "This removes user control" |
+| **Bostock** | *Web-native & expressive code* | "This is too constrained for rich interaction" |
+
+**Consensus Question**: *How can users explore without getting lost?*
+
+---
+
+### Panel 6: Open Science vs. All Perspectives
+**Tension**: Open standards & community benefit vs. specialized excellence
+
+| Persona | Philosophy | Characteristic Critique |
+|---------|-----------|--------------------------|
+| **Chamberlain** | *Open science & community tools* | "Who can maintain this? Is it transparent?" |
+| **Domain Expert(s)** | *Specialized excellence in craft* | "Does it meet scientific/design standards?" |
+
+**Consensus Question**: *How do we balance openness with excellence?*
+
+---
+
+### The Deliberation Graph
+
+```
+     Tufte ←→ Rosling
+       ↑         ↑
+       │         │
+    Bertin ←→ Posavec
+       │         
+       │    Hadley ←→ Lupi
+       │       ↑        ↑
+       │       │        │
+      Few ←→ Norman ← Bryan ← Chamberlain
+       │       ↑         ↑
+       │       │         │
+       └── Shneiderman ←→ Bostock
+```
+
+**How to use these panels**:
+1. Run evaluation with multiple agents
+2. Conflicts emerge between natural opponents  
+3. Each panel surfaces design trade-offs
+4. Consensus around antagonistic pairs = robust design decisions
+
+Each pair creates **productive friction**—where both sides have valid concerns, designers must integrate both perspectives rather than choosing one.
+
+---
+
+
 
 Two analysis depths:
 - **Sample**: README + directory structure + package.json (fast)

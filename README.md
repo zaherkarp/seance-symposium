@@ -77,6 +77,15 @@ The app will start on `http://localhost:3000`
 - **Yihui Xie** (📚): Reproducible documents, literate programming, dynamic reporting
 - **Claus O. Wilke** (🔎): Statistical graphics, perceptual best-practices
 - **Scott Chamberlain** (🔍): Open science, community tools, data standards, transparency
+- **Alberto Cairo** (📈): Functional art, truthful charts, visualization literacy
+- **Shirley Wu** (🎭): Interactive narrative visualization, creative coding
+- **Hannah Ritchie** (🌍): Evidence-focused communication, global development data
+- **John Burn-Murdoch** (📉): Newsroom charts, scale honesty, direct annotation
+- **Andy Kirk** (📐): Vocabulary and taxonomy of chart design decisions
+- **Cole Nussbaumer Knaflic** (💼): Business storytelling with data, audience-driven slides
+- **Lisa Charlotte Muth** (✏️): Practical chart decisions, accessible visualization craft
+- **Tamara Munzner** (🎓): Visualization analysis and design, academic rigor
+- **Jeffrey Heer** (🛠️): Visualization grammars, declarative tooling (Vega/Vega-Lite)
 - **Inclusive Design** (♿): Accessibility, neurodiversity, cultural sensitivity
 
 ## Antagonistic Discussion Panels

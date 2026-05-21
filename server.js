@@ -81,7 +81,6 @@ const AGENTS = {
     name: "Hans Rosling",
     icon: "🎬",
     philosophy: "Narrative, engagement, accessibility",
-    weight: 1.05,
     prompt: buildAgentPrompt(
       "You are Hans Rosling, champion of accessible data storytelling. Your philosophy: engage audiences, illuminate insights, tell stories that move people.",
       [
@@ -98,7 +97,6 @@ const AGENTS = {
     name: "Jacques Bertin",
     icon: "🧬",
     philosophy: "Systematic rigor, semiotic correctness",
-    weight: 1.15,
     prompt: buildAgentPrompt(
       "You are Jacques Bertin, semiotician of visual encoding and visual scientist. Your philosophy: visual encoding must be systematic, perceptually effective, and scientifically rigorous.",
       [
@@ -115,7 +113,6 @@ const AGENTS = {
     name: "Stephen Few",
     icon: "⚙️",
     philosophy: "Pragmatism, business value, performance",
-    weight: 1.1,
     prompt: buildAgentPrompt(
       "You are Stephen Few, pragmatist and business strategist. Your philosophy: does it work? Can teams maintain it? Does it solve real problems profitably?",
       [
@@ -132,7 +129,6 @@ const AGENTS = {
     name: "Ben Shneiderman",
     icon: "🎮",
     philosophy: "User agency, control, exploration",
-    weight: 1.1,
     prompt: buildAgentPrompt(
       "You are Ben Shneiderman, pioneer of human-computer interaction. Your philosophy: users must have agency, control, and freedom to explore.",
       [
@@ -149,7 +145,6 @@ const AGENTS = {
     name: "Don Norman",
     icon: "🧠",
     philosophy: "Human-centered usability, product psychology",
-    weight: 1.1,
     prompt: buildAgentPrompt(
       "You are Don Norman, cognitive design thinker and usability evangelist. Your philosophy: design should be intuitive, forgiving, and aligned with people’s mental models.",
       [
@@ -166,7 +161,6 @@ const AGENTS = {
     name: "John Maeda",
     icon: "💻",
     philosophy: "Computational design, digital elegance",
-    weight: 1.05,
     prompt: buildAgentPrompt(
       "You are John Maeda, designer of digital systems and computational aesthetics. Your philosophy: beauty emerges from clarity, simplicity, and expressive interaction.",
       [
@@ -375,6 +369,7 @@ const AGENTS = {
     name: "Claus O. Wilke",
     icon: "🔎",
     philosophy: "Statistical graphics and perceptual best-practices",
+    weight: 1.2,
     prompt: buildAgentPrompt(
       "You are Claus O. Wilke, advocate for perceptually grounded statistical graphics. Your philosophy: graphics should follow perceptual best practices and clearly communicate statistical relationships.",
       [
@@ -391,7 +386,6 @@ const AGENTS = {
     name: "Scott Chamberlain",
     icon: "🔍",
     philosophy: "Open science, community tools, data standards, transparency",
-    weight: 1.0,
     prompt: buildAgentPrompt(
       "You are Scott Chamberlain, advocate for open science, reproducible tools, and community-driven scientific software. Your philosophy: data and tools should be openly accessible, standards-compliant, and collaboratively maintained to advance science.",
       [
@@ -408,6 +402,7 @@ const AGENTS = {
     name: "Alberto Cairo",
     icon: "📈",
     philosophy: "Functional art, truthful charts, visualization literacy",
+    weight: 1.2,
     prompt: buildAgentPrompt(
       "You are Alberto Cairo, journalist, academic, and author of The Functional Art and How Charts Lie. Your philosophy: visualization is both a functional tool and an art form, and viewers deserve charts that inform truthfully without manipulating perception.",
       [
@@ -488,6 +483,7 @@ const AGENTS = {
     name: "Cole Nussbaumer Knaflic",
     icon: "💼",
     philosophy: "Business storytelling with data, audience-driven communication",
+    weight: 1.2,
     prompt: buildAgentPrompt(
       "You are Cole Nussbaumer Knaflic, author of Storytelling with Data. Your philosophy: in business settings, every chart should be subordinated to a single insight the audience must act on, and clutter is the enemy of decision-making.",
       [
@@ -520,7 +516,7 @@ const AGENTS = {
     name: "Tamara Munzner",
     icon: "🎓",
     philosophy: "Visualization analysis and design, academic rigor",
-    weight: 1.1,
+    weight: 1.2,
     prompt: buildAgentPrompt(
       "You are Tamara Munzner, professor at UBC and author of Visualization Analysis and Design. Your philosophy: visualization is a design problem with a defined task abstraction, data abstraction, and encoding — and good critique starts by naming what task the visualization is meant to support.",
       [
@@ -537,7 +533,6 @@ const AGENTS = {
     name: "Jeffrey Heer",
     icon: "🛠️",
     philosophy: "Visualization grammars, declarative tooling, Vega/Vega-Lite",
-    weight: 1.1,
     prompt: buildAgentPrompt(
       "You are Jeffrey Heer, professor at the University of Washington and co-creator of D3, Vega, and Vega-Lite. Your philosophy: visualizations are most powerful when they are specified declaratively, composed from a grammar, and built on infrastructure that scales from quick exploration to production.",
       [
@@ -554,6 +549,7 @@ const AGENTS = {
     name: "Inclusive Design",
     icon: "♿",
     philosophy: "Accessibility, neurodiversity, cultural sensitivity",
+    weight: 1.2,
     prompt: buildAgentPrompt(
       "You are the voice of Inclusive Design. Your philosophy: accessibility and clarity for all cognitive styles, motor abilities, sensory modalities, and cultural contexts. Leave no user behind.",
       [

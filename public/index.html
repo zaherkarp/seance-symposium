@@ -7,7 +7,19 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://unpkg.com/marked@13/marked.min.js"></script>
+  <!--
+    Markdown rendering libraries are vendored (served from public/vendor/) instead of
+    loaded from unpkg. Rationale:
+      - The old tag floated to whatever marked 13.x the CDN served
+        and had no integrity hash, so a compromised CDN or package release could inject
+        script into this page. This page can call /api/evaluate, so script here is
+        dangerous.
+      - Vendoring pins exact bytes (see public/vendor/README.md for versions and hashes)
+        and works offline, which suits a tool meant to run on localhost.
+    Order matters: DOMPurify must load before the Babel script that calls renderMarkdown.
+  -->
+  <script src="/vendor/marked-13.0.3.min.js"></script>
+  <script src="/vendor/purify-3.5.0.min.js"></script>
   <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
   <style>
     * {
@@ -161,12 +173,35 @@
       { key: 'conclusion', label: 'Conclusion', icon: '🏁' },
     ];
 
+    // Escape every HTML-significant character. Used as the fail-closed fallback when
+    // parsing or sanitizing is not possible, so raw model text never reaches innerHTML.
+    function escapeHtml(text) {
+      return String(text).replace(/[&<>"']/g, (c) =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+      );
+    }
+
+    // Convert model-written markdown to HTML that is safe for dangerouslySetInnerHTML.
+    //
+    // Why sanitize: the synthesized sections are written by the model, and the model's
+    // input includes text the operator does not control (the README of the repo being
+    // reviewed, server.js analyzeRepository). marked passes raw HTML through untouched,
+    // so a model that echoes something like <img src=x onerror=...> would run script in
+    // this page. A local test fed exactly that through /api/synthesize and the handler ran.
+    //
+    // DOMPurify strips event-handler attributes, <script>, javascript: URLs and similar,
+    // while keeping the ordinary markup marked produces (headings, lists, links, code).
     function renderMarkdown(text) {
       if (!text) return { __html: '' };
+      // Fail closed: if the sanitizer did not load (blocked file, typo in a path), show
+      // escaped text rather than unsanitized HTML.
+      if (typeof DOMPurify === 'undefined' || typeof DOMPurify.sanitize !== 'function') {
+        return { __html: escapeHtml(text) };
+      }
       try {
-        return { __html: marked.parse(text, { breaks: true }) };
+        return { __html: DOMPurify.sanitize(marked.parse(text, { breaks: true })) };
       } catch (err) {
-        return { __html: text.replace(/</g, '&lt;') };
+        return { __html: escapeHtml(text) };
       }
     }
 

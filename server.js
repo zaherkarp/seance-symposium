@@ -1,6 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import express from "express";
-import { execSync } from "child_process";
+// SECURITY: we use execFileSync, never execSync. execSync hands its whole string to /bin/sh,
+// so any user-controlled text inside it (such as repoUrl) can smuggle in extra shell commands.
+// execFileSync runs the binary directly with an argument array: no shell, no word splitting,
+// no metacharacter interpretation.
+import { execFileSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -491,12 +495,158 @@ async function fetchGitHubRepoSummary(owner, repo) {
   return summary.join("\n\n");
 }
 
+// ---------------------------------------------------------------------------
+// repoUrl validation
+// ---------------------------------------------------------------------------
+// Background: POST /api/evaluate used to pass req.body.repoUrl straight into
+//   execSync(`git clone --depth 1 ${repoUrl} ${tempDir}`)
+// which runs through /bin/sh. A value like
+//   "https://example.invalid/x.git; touch /tmp/pwned #"
+// ran an arbitrary command as the server's user, with ANTHROPIC_API_KEY and GITHUB_TOKEN in
+// its environment. The clone now uses execFileSync (no shell), which on its own closes the
+// injection. This validator is a second, independent layer: it rejects anything that is not a
+// plain https GitHub repository URL *before* any process is started, so a future refactor that
+// reintroduces a shell, or a git option-parsing quirk, still cannot be reached from the API.
+
+// Hosts we are willing to clone from. Kept deliberately tiny: the UI only ever asks for a
+// GitHub URL, and every extra host is more attack surface (e.g. an internal git server on the
+// LAN that the operator's machine can reach but the requester should not).
+const ALLOWED_REPO_HOSTS = new Set(["github.com", "www.github.com"]);
+
+// Characters with meaning to a POSIX shell, plus quotes, backslash and whitespace. None of
+// these appear in a legitimate "https://github.com/owner/repo" URL, so seeing any of them is a
+// strong signal of an injection attempt and we refuse outright rather than trying to escape.
+const SHELL_METACHARACTERS = /[;&|`$<>(){}\[\]!*?~'"\\\s]/;
+
+// Any ASCII control character (NUL through US, and DEL). Newlines in particular can split a
+// command; NUL can truncate strings in C-level code paths.
+const CONTROL_CHARACTERS = /[\x00-\x1f\x7f]/;
+
+// GitHub owner names: alphanumerics and hyphens. Repository names: alphanumerics, ".", "_",
+// "-". We additionally refuse a leading "-" or "." so a segment can never look like a CLI flag
+// or a relative path component ("." / "..").
+const SAFE_PATH_SEGMENT = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
+
+// Generous upper bound; real repo URLs are far shorter. Stops pathological inputs early.
+const MAX_REPO_URL_LENGTH = 2048;
+
+/**
+ * Validate and canonicalise a user-supplied repository URL.
+ *
+ * Returns { ok: true, url } with a rebuilt "https://github.com/<owner>/<repo>.git" string on
+ * success, or { ok: false, error } with a short reason on failure. We return a *rebuilt* URL
+ * rather than the caller's string so that nothing the caller sent beyond the owner and repo
+ * names (userinfo, ports, query strings, fragments, odd encodings) ever reaches git.
+ */
+function validateRepoUrl(raw) {
+  // Type check first: JSON bodies can carry numbers, arrays, objects. Only strings are sane.
+  if (typeof raw !== "string") {
+    return { ok: false, error: "repoUrl must be a string" };
+  }
+  const value = raw.trim();
+  if (value.length === 0 || value.length > MAX_REPO_URL_LENGTH) {
+    return { ok: false, error: "repoUrl is empty or too long" };
+  }
+  // A leading "-" would be read by git as an option (e.g. "--upload-pack=<cmd>"), a classic
+  // argument-injection vector even when no shell is involved.
+  if (value.startsWith("-")) {
+    return { ok: false, error: "repoUrl must not start with '-'" };
+  }
+  if (CONTROL_CHARACTERS.test(value) || SHELL_METACHARACTERS.test(value)) {
+    return { ok: false, error: "repoUrl contains characters that are not allowed" };
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return { ok: false, error: "repoUrl is not a valid URL" };
+  }
+
+  // https only. This also shuts out git's other transports: file://, ssh://, git://, and the
+  // "ext::<command>" transport that runs an arbitrary command by design.
+  if (parsed.protocol !== "https:") {
+    return { ok: false, error: "repoUrl must use https" };
+  }
+  if (!ALLOWED_REPO_HOSTS.has(parsed.hostname.toLowerCase())) {
+    return { ok: false, error: "repoUrl host is not allowed (only github.com)" };
+  }
+  // Embedded credentials ("https://user:token@github.com/...") and explicit ports are never
+  // needed for a public GitHub clone and only widen what an attacker can steer.
+  if (parsed.username || parsed.password || parsed.port) {
+    return { ok: false, error: "repoUrl must not include credentials or a port" };
+  }
+  if (parsed.search || parsed.hash) {
+    return { ok: false, error: "repoUrl must not include a query string or fragment" };
+  }
+
+  // Expect exactly "/owner/repo", optionally with ".git" and/or a trailing slash.
+  const segments = parsed.pathname
+    .replace(/\/+$/, "") // drop trailing slash(es)
+    .replace(/\.git$/, "") // drop optional .git suffix
+    .split("/")
+    .filter((s) => s.length > 0);
+  if (segments.length !== 2 || !segments.every((s) => SAFE_PATH_SEGMENT.test(s))) {
+    return { ok: false, error: "repoUrl must look like https://github.com/<owner>/<repo>" };
+  }
+
+  const [owner, repo] = segments;
+  return { ok: true, url: `https://github.com/${owner}/${repo}.git` };
+}
+
+/**
+ * Recursively list up to `limit` files under `root` whose extension is in `extensions`.
+ *
+ * Replaces a former `execSync("find ${tempDir} ... | head -20")` call. tempDir was
+ * server-generated so that one was not exploitable, but it still went through a shell for no
+ * reason, and its find expression had an operator-precedence bug (-type f only applied to the
+ * first -name). Doing it in Node removes the shell and makes the intent explicit.
+ */
+function listKeyFiles(root, extensions, limit) {
+  const results = [];
+  const stack = [root];
+  while (stack.length > 0 && results.length < limit) {
+    const dir = stack.pop();
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue; // unreadable directory: skip rather than fail the whole analysis
+    }
+    for (const entry of entries) {
+      // Skip git internals and dependency folders; they are noise for a design review.
+      if (entry.name === ".git" || entry.name === "node_modules") continue;
+      const full = path.join(dir, entry.name);
+      // isFile()/isDirectory() on a Dirent do not follow symlinks, so a malicious repo cannot
+      // use a symlink to make us walk outside the clone directory.
+      if (entry.isDirectory()) {
+        stack.push(full);
+      } else if (entry.isFile() && extensions.has(path.extname(entry.name))) {
+        results.push(full);
+        if (results.length >= limit) break;
+      }
+    }
+  }
+  return results;
+}
+
 async function cloneRepository(repoUrl) {
+  // Defence in depth: callers are expected to pass an already-validated URL, but re-check here
+  // so this function is safe even if a future caller forgets.
+  const check = validateRepoUrl(repoUrl);
+  if (!check.ok) {
+    throw new Error(`Refusing to clone: ${check.error}`);
+  }
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "repo-"));
   try {
-    execSync(`git clone --depth 1 ${repoUrl} ${tempDir}`, {
+    // No shell. "--" tells git that everything after it is positional (URL, directory), never
+    // an option, which blocks argument injection even if validation were somehow bypassed.
+    execFileSync("git", ["clone", "--depth", "1", "--", check.url, tempDir], {
       timeout: 30000,
       stdio: "pipe",
+      // GIT_TERMINAL_PROMPT=0 makes git fail fast instead of waiting for a username/password
+      // on private or nonexistent repos (it would otherwise hang until the 30s timeout).
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
     });
     const analysisParts = [`Repository clone path: ${tempDir}`];
     const readmePath = path.join(tempDir, "README.md");
@@ -505,11 +655,8 @@ async function cloneRepository(repoUrl) {
       analysisParts.push(`README.md:\n${readme.substring(0, 2000)}`);
     }
     try {
-      const structure = execSync(
-        `find ${tempDir} -type f -name "*.json" -o -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" | head -20`,
-        { encoding: "utf-8" }
-      );
-      analysisParts.push(`Repository structure (key files):\n${structure}`);
+      const keyFiles = listKeyFiles(tempDir, new Set([".json", ".ts", ".tsx", ".js", ".jsx"]), 20);
+      analysisParts.push(`Repository structure (key files):\n${keyFiles.join("\n")}`);
     } catch {
       analysisParts.push("Repository structure listing failed.");
     }
@@ -520,8 +667,10 @@ async function cloneRepository(repoUrl) {
     }
     return analysisParts.join("\n\n");
   } finally {
+    // Replaces execSync(`rm -rf ${tempDir}`). Same effect, no shell. force: true means a
+    // missing directory is not an error.
     try {
-      execSync(`rm -rf ${tempDir}`);
+      fs.rmSync(tempDir, { recursive: true, force: true });
     } catch {
       // Ignore cleanup failures.
     }
@@ -1077,6 +1226,18 @@ app.post("/api/evaluate", async (req, res) => {
   try {
     const { context, repoUrl, repoDepth, includeSynthesis } = req.body;
 
+    // SECURITY: validate repoUrl before anything else happens (before the API-key check, before
+    // any clone or API call). A bad value gets a 400 and no process is ever started. An empty
+    // string is how the UI says "no repo", so only truthy values are validated.
+    let safeRepoUrl = null;
+    if (repoUrl) {
+      const check = validateRepoUrl(repoUrl);
+      if (!check.ok) {
+        return res.status(400).json({ error: `Invalid repoUrl: ${check.error}` });
+      }
+      safeRepoUrl = check.url;
+    }
+
     if (!process.env.ANTHROPIC_API_KEY) {
       return res.status(500).json({
         error: "ANTHROPIC_API_KEY environment variable not set",
@@ -1085,9 +1246,10 @@ app.post("/api/evaluate", async (req, res) => {
 
     let finalContext = context || "";
 
-    if (repoUrl) {
-      console.log(`[API] Analyzing repository: ${repoUrl}`);
-      const repoAnalysis = await analyzeRepository(repoUrl, repoDepth || "sample");
+    if (safeRepoUrl) {
+      // From here on only the canonicalised URL is used, never the raw request value.
+      console.log(`[API] Analyzing repository: ${safeRepoUrl}`);
+      const repoAnalysis = await analyzeRepository(safeRepoUrl, repoDepth || "sample");
       finalContext += `\n\nREPOSITORY ANALYSIS:\n${repoAnalysis}`;
     }
 
@@ -1160,14 +1322,20 @@ app.get("*", (req, res) => {
   });
 });
 
-export { parseAgentResponse, parsePresentationSections, AGENTS, GRAD_STUDENTS };
+// `app`, `validateRepoUrl` and `cloneRepository` are exported so test/security.test.js can exercise the real
+// route and validator without starting the server on a fixed port.
+export { app, validateRepoUrl, cloneRepository, parseAgentResponse, parsePresentationSections, AGENTS, GRAD_STUDENTS };
 
 // START SERVER (only when run directly, not when imported for tests)
 const isMain = import.meta.url === `file://${process.argv[1]}`;
 if (isMain) {
   const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
-    console.log(`\n🚀 Seance Symposium running on http://localhost:${PORT}`);
+  // SECURITY: listen on loopback by default. The server has no authentication, so binding to
+  // every interface (Express's default when no host is given) exposed it to anyone on the same
+  // network. Set HOST=0.0.0.0 (or a specific address) to opt back in, ideally behind auth.
+  const HOST = process.env.HOST || "127.0.0.1";
+  app.listen(PORT, HOST, () => {
+    console.log(`\n🚀 Seance Symposium running on http://${HOST}:${PORT}`);
     console.log(`✓ API Key: ${process.env.ANTHROPIC_API_KEY ? "set" : "NOT SET"}`);
     console.log(`✓ Static files: ${publicPath}\n`);
   });

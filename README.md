@@ -204,6 +204,13 @@ Required:
 
 Optional:
 - `PORT` - Server port (default: 3000)
+- `HOST` - Address to listen on (default: `127.0.0.1`, this machine only). The server has no authentication, so it no longer listens on every network interface by default. Set `HOST=0.0.0.0` only if you need other devices to reach it, and preferably put it behind authentication first.
+
+## Security notes
+
+- Repository URLs must be plain `https://github.com/<owner>/<repo>` URLs (an optional `.git` suffix or trailing slash is fine). Anything else, including other hosts, `ssh://` or `file://` URLs, embedded credentials, ports, query strings, values starting with `-`, and shell characters such as `;`, `|` or `$`, is rejected with HTTP 400 before anything runs.
+- Repositories are cloned by calling `git` directly, never through a shell.
+- Run `npm test` to check these protections.
 
 ## Troubleshooting
 
@@ -212,6 +219,12 @@ Optional:
 
 **"Repository analysis failed"**
 → Ensure the git repo URL is public and valid
+
+**"Invalid repoUrl: ..."**
+→ Only public GitHub repositories given as `https://github.com/<owner>/<repo>` are accepted. The message says which rule the URL broke.
+
+**Can't reach the app from another device**
+→ It listens on `127.0.0.1` by default. Start it with `HOST=0.0.0.0 npm start` to listen on all interfaces.
 
 **"Evaluation failed"**
 → Check your API key is valid and has remaining credits
